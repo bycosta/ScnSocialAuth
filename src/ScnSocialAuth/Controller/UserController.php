@@ -2,7 +2,6 @@
 namespace ScnSocialAuth\Controller;
 
 use Hybrid_Auth;
-use ScnSocialAuth\Mapper\UserProviderInterface;
 use ScnSocialAuth\Options\ModuleOptions;
 use ZfcUser\Options\ModuleOptions as ZfcUserModuleOptions;
 use Zend\Mvc\Controller\AbstractActionController;
@@ -11,11 +10,6 @@ use Zend\View\Model\ViewModel;
 
 class UserController extends AbstractActionController
 {
-    /**
-     * @var UserProviderInterface
-     */
-    protected $mapper;
-
     /**
      * @var Hybrid_Auth
      */
@@ -26,52 +20,11 @@ class UserController extends AbstractActionController
      */
     protected $options;
 
-    /*
-     * @todo Make this dynamic / translation-friendly
-     * @var string
+    /**
+     *
+     * @var ZfcUserModuleOptions
      */
-    protected $failedAddProviderMessage = 'Add provider failed. Please try again.';
-
-    public function addProviderAction()
-    {
-        // Make sure the provider is enabled, else 404
-        $provider = $this->params('provider');
-        if (!in_array($provider, $this->getOptions()->getEnabledProviders())) {
-            return $this->notFoundAction();
-        }
-
-        $authService = $this->zfcUserAuthentication()->getAuthService();
-
-        // If user is not logged in, redirect to login page
-        if (!$authService->hasIdentity()) {
-            return $this->redirect()->toRoute('zfcuser/login');
-        }
-
-        $hybridAuth = $this->getHybridAuth();
-        $adapter = $hybridAuth->authenticate($provider);
-
-        if (!$adapter->isUserConnected()) {
-            $this->flashMessenger()->setNamespace('zfcuser-index')->addMessage($this->failedAddProviderMessage);
-
-            return $this->redirect()->toRoute('zfcuser');
-        }
-
-        $localUser = $authService->getIdentity();
-        $userProfile = $adapter->getUserProfile();
-        $accessToken = $adapter->getAccessToken();
-
-        $this->getMapper()->linkUserToProvider($localUser, $userProfile, $provider, $accessToken);
-
-        $redirect = $this->params()->fromQuery('redirect', false);
-
-        if ($this->getServiceLocator()->get('zfcuser_module_options')->getUseRedirectParameterIfPresent() && $redirect) {
-            return $this->redirect()->toUrl($redirect);
-        }
-
-        return $this->redirect()->toRoute(
-            $this->getServiceLocator()->get('zfcuser_module_options')->getLoginRedirectRoute()
-        );
-    }
+    protected $zfcUserOptions;
 
     public function providerLoginAction()
     {
@@ -82,7 +35,7 @@ class UserController extends AbstractActionController
         $hybridAuth = $this->getHybridAuth();
 
         $query = array('provider' => $provider);
-        if ($this->getServiceLocator()->get('zfcuser_module_options')->getUseRedirectParameterIfPresent() && $this->getRequest()->getQuery()->get('redirect')) {
+        if ($this->getZfcUserOptions()->getUseRedirectParameterIfPresent() && $this->getRequest()->getQuery()->get('redirect')) {
             $query = array_merge($query, array('redirect' => $this->getRequest()->getQuery()->get('redirect')));
         }
         $redirectUrl = $this->url()->fromRoute('scn-social-auth-user/authenticate/query', $query);
@@ -107,7 +60,7 @@ class UserController extends AbstractActionController
         $viewModel->addChild($zfcUserLogin, 'zfcUserLogin');
         $viewModel->setVariable('options', $this->getOptions());
 
-        if ($this->getServiceLocator()->get('zfcuser_module_options')->getUseRedirectParameterIfPresent() && $this->getRequest()->getQuery()->get('redirect')) {
+        if ($this->getZfcUserOptions()->getUseRedirectParameterIfPresent() && $this->getRequest()->getQuery()->get('redirect')) {
             $redirect = $this->getRequest()->getQuery()->get('redirect');
         } else {
             $redirect = false;
@@ -135,33 +88,6 @@ class UserController extends AbstractActionController
         $viewModel->setVariable('options', $this->getOptions());
 
         return $viewModel;
-    }
-
-    /**
-     * set mapper
-     *
-     * @param  UserProviderInterface $mapper
-     * @return HybridAuth
-     */
-    public function setMapper(UserProviderInterface $mapper)
-    {
-        $this->mapper = $mapper;
-
-        return $this;
-    }
-
-    /**
-     * get mapper
-     *
-     * @return UserProviderInterface
-     */
-    public function getMapper()
-    {
-        if (!$this->mapper instanceof UserProviderInterface) {
-            $this->setMapper($this->getServiceLocator()->get('ScnSocialAuth-UserProviderMapper'));
-        }
-
-        return $this->mapper;
     }
 
     /**
@@ -216,5 +142,32 @@ class UserController extends AbstractActionController
         }
 
         return $this->options;
+    }
+
+    /**
+     * set options
+     *
+     * @param  ZfcUserModuleOptions  $options
+     * @return UserController
+     */
+    public function setZfcUserOptions(ZfcUserModuleOptions $options)
+    {
+        $this->zfcUserOptions = $options;
+
+        return $this;
+    }
+
+    /**
+     * get ZfcUser options
+     *
+     * @return ZfcUserModuleOptions
+     */
+    public function getZfcUserOptions()
+    {
+        if (!$this->zfcUserOptions instanceof ZfcUserModuleOptions) {
+            $this->setOptions($this->getServiceLocator()->get('zfcuser_module_options'));
+        }
+
+        return $this->zfcUserOptions;
     }
 }

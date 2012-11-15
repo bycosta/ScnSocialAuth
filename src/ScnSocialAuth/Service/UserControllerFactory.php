@@ -20,14 +20,15 @@ class UserControllerFactory implements FactoryInterface
 {
     public function createService(ServiceLocatorInterface $controllerManager)
     {
-        $mapper = $controllerManager->getServiceLocator()->get('ScnSocialAuth-UserProviderMapper');
-        $hybridAuth = $controllerManager->getServiceLocator()->get('HybridAuth');
-        $moduleOptions = $controllerManager->getServiceLocator()->get('ScnSocialAuth-ModuleOptions');
+        $services = $controllerManager->getServiceLocator();
+        $hybridAuth = $services->get('HybridAuth');
+        $moduleOptions = $services->get('ScnSocialAuth-ModuleOptions');
+        $zfcUserOptions = $services->get('zfcuser_module_options');
 
         $controller = new UserController();
-        $controller->setMapper($mapper);
         $controller->setHybridAuth($hybridAuth);
         $controller->setOptions($moduleOptions);
+        $controller->setZfcUserOptions($zfcUserOptions);
 
         return $controller;
     }
